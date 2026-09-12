@@ -69,18 +69,19 @@ async fn main() -> Result<()> {
     let d_msg = Arc::clone(&deps);
 
     let handler = dptree::entry().branch(
-        Update::filter_message().branch(
-            dptree::entry()
-                .filter_command::<Command>()
-                .endpoint(move |msg: Message, cmd: Command| {
-                    let d = Arc::clone(&d_cmd);
-                    async move { handlers::command_handler(d, msg, cmd).await }
-                })
-                .branch(dptree::endpoint(move |msg: Message| {
-                    let d = Arc::clone(&d_msg);
-                    async move { handlers::message_handler(d, msg).await }
-                })),
-        ),
+        Update::filter_message()
+            .branch(
+                dptree::entry()
+                    .filter_command::<Command>()
+                    .endpoint(move |msg: Message, cmd: Command| {
+                        let d = Arc::clone(&d_cmd);
+                        async move { handlers::command_handler(d, msg, cmd).await }
+                    }),
+            )
+            .branch(dptree::endpoint(move |msg: Message| {
+                let d = Arc::clone(&d_msg);
+                async move { handlers::message_handler(d, msg).await }
+            })),
     );
 
     Dispatcher::builder(bot, handler)

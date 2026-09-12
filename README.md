@@ -121,13 +121,31 @@ Estilos: `obsidian` | `logseq` | `plain`. La salida se escribe como `<título>.m
 ## Uso — Bot de Telegram
 
 ```bash
+# Cargar variables del .env (exporta para que el proceso las vea)
+set -a && source .env && set +a
+
 export TELOXIDE_TOKEN=...
 cargo run -p voice2md-telegram-bot
+```
+
+`source .env` a secas NO exporta las variables; sin `set -a` el bot falla con
+`Cannot get the TELOXIDE_TOKEN env variable`. Alternativa directa:
+
+```bash
+TELOXIDE_TOKEN=tu_token cargo run -p voice2md-telegram-bot
 ```
 
 Envía una nota de voz y recibirás el Markdown formateado por chat (o como documento `.md` si excede 4096 caracteres).
 
 Comandos: `/start`, `/help`, `/style <estilo>`, `/language <LANG>`.
+
+### Troubleshooting
+
+| Síntoma | Causa / solución |
+|---------|------------------|
+| Panic `Cannot get the TELOXIDE_TOKEN env variable` | Token no exportado. Usa `set -a && source .env && set +a` o `TELOXIDE_TOKEN=... cargo run` |
+| Bot arranca pero no responde | Token inválido o bot no creado en @BotFather |
+| Errores al transcribir | Motor remoto requiere `OPENAI_API_KEY` cargada
 
 ## Configuración
 
