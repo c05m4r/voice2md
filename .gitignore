@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+*.ggml
+*.bin
+config/local.toml
+*.env
