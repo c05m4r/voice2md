@@ -148,7 +148,63 @@ TELOXIDE_TOKEN=tu_token cargo run -p voice2md-telegram-bot
 
 Envía una nota de voz y recibirás el Markdown formateado por chat (o como documento `.md` si excede 4096 caracteres).
 
-Comandos: `/start`, `/help`, `/style <estilo>`, `/language <LANG>`.
+Comandos: `/start`, `/help`, `/style <estilo>`, `/language <LANG>`, `/allow <id>`, `/deny <id>`, `/mode <public|private>`.
+
+### Control de acceso
+
+El bot admite dos modos de acceso:
+
+| Modo | Comportamiento |
+|------|----------------|
+| `public` | Cualquiera puede transcribir (default) |
+| `private` | Solo usuarios en la whitelist transcriben |
+
+Cualquier usuario **en la whitelist** puede administrar el bot:
+
+- `/allow <id>` — autoriza a un usuario
+- `/deny <id>` — revoca el acceso
+- `/mode public|private` — cambia el modo
+
+La whitelist y el modo se persisten en `whitelist.json` (ruta configurable) y sobreviven a los reinicios. Para arrancar con tus propios IDs ya autorizados, siémbralos con:
+
+```bash
+export VOICE2MD_WHITELIST=123456789,987654321
+```
+
+Formato de `whitelist.json`:
+
+```json
+{
+  "mode": "private",
+  "users": [
+    987654321,
+    123456789
+  ]
+}
+```
+
+> Usa `/whoami` en el bot para conocer tu ID de usuario.
+
+> Nota: en modo `private`, las notas de voz de usuarios no autorizados se ignoran silenciosamente.
+
+### Guardado en disco
+
+Además del chat, el bot guarda cada transcripción como `.md` en disco, discriminada por usuario:
+
+```
+<out_dir>/
+  user_<telegram_id>/
+    <título_snake_case>_<timestamp>.md
+  local/                 # notas vía CLI/archivo (sin user_id)
+```
+
+El nombre usa el título en `snake_case` más un timestamp UTC (`%Y%m%dT%H%M%SZ`), p. ej. `mi_nota_de_clase_20260912T153000Z.md`.
+
+Configura el directorio raíz con:
+
+```bash
+export VOICE2MD_OUT_DIR=notes   # default
+```
 
 ### Motor local vs remoto
 
@@ -170,6 +226,9 @@ Variables de entorno (ver `.env.example`):
 | `VOICE2MD_MODEL_PATH` | Ruta al modelo local (default `models/ggml-tiny.bin`) |
 | `OPENAI_API_KEY` | Clave para el motor remoto |
 | `VOICE2MD_CONFIG` | Ruta a `config.toml` (opcional) |
+| `VOICE2MD_OUT_DIR` | Directorio donde el bot guarda las notas (default `notes`) |
+| `VOICE2MD_WHITELIST` | IDs iniciales autorizados, separados por coma (opcional) |
+| `VOICE2MD_ACCESS_FILE` | Archivo que persiste whitelist y modo (default `whitelist.json`) |
 
 La CLI también lee `config.toml` (local o `~/.config/voice2md/config.toml`). Ejemplo en `config/config.example.toml`.
 

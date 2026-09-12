@@ -1,8 +1,10 @@
 //! Bot de Telegram: recibe notas de voz, las transcribe y responde con Markdown.
 
+mod access;
 mod audio_repo;
 mod handlers;
 mod state;
+mod storage;
 
 use std::sync::Arc;
 
@@ -15,9 +17,11 @@ use tracing::info;
 use voice2md_core::{DefaultFormatter, NoteOrchestrator, OrchestratorBuilder};
 use voice2md_transcriber::{RemoteWhisperConfig, RemoteWhisperEngine};
 
+use crate::access::AccessControl;
 use crate::audio_repo::TelegramAudioRepository;
 use crate::handlers::Command;
 use crate::state::InMemUserState;
+use crate::storage::FileStorage;
 
 /// Máximo de caracteres por mensaje de Telegram.
 const MAX_REPLY_CHARS: usize = 4096;
@@ -27,6 +31,7 @@ pub struct BotDeps {
     pub bot: Bot,
     pub orchestrator: Arc<NoteOrchestrator>,
     pub state: Arc<InMemUserState>,
+    pub access: Arc<AccessControl>,
 }
 
 #[tokio::main]
@@ -64,8 +69,22 @@ async fn main() -> Result<()> {
             Ok(other) => anyhow::bail!("unknown VOICE2MD_ENGINE: {other} (local | remote)"),
         };
 
-    let storage = Box::new(handlers::ChatStorage);
+    let storage = Box::new(FileStorage::new(
+        std::env::var("VOICE2MD_OUT_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::path::PathBuf::from("notes")),
+    ));
     let audio_repo = Box::new(TelegramAudioRepository::new(token));
+
+    let access_file = std::env::var("VOICE2MD_ACCESS_FILE")
+        .unwrap_or_else(|_| "whitelist.json".to_owned());
+    let access = Arc::new(
+        AccessControl::load(
+            &access_file,
+            std::env::var("VOICE2MD_WHITELIST").ok().as_deref(),
+        )
+        .expect("failed to load access control"),
+    );
 
     let orchestrator = OrchestratorBuilder::default()
         .engine(engine)
@@ -79,6 +98,7 @@ async fn main() -> Result<()> {
         bot: bot.clone(),
         orchestrator: Arc::new(orchestrator),
         state: Arc::new(InMemUserState::default()),
+        access,
     });
 
     info!("telegram bot starting");
