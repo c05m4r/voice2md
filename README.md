@@ -18,8 +18,19 @@ Escrito en Rust (edition 2024) con arquitectura hexagonal, type-driven design y 
 ## Requisitos
 
 - Rust (edition 2024)
-- Motor local: binario `whisper-cli` (whisper.cpp) + modelo `ggml-*.bin` en `PATH`
+- Motor local: binario `whisper-cli` (whisper.cpp) + modelo `ggml-*.bin` + `ffmpeg`
 - Motor remoto: clave de API (p. ej. OpenAI)
+
+### Motor local (Ubuntu)
+
+```bash
+sudo apt install whisper.cpp ffmpeg
+mkdir -p models
+wget -O models/ggml-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+```
+
+`whisper-cli` de apt solo lee WAV; los formatos comprimidos (ogg de Telegram, m4a…)
+se convierten a WAV con `ffmpeg` automáticamente.
 
 ## Instalación
 
@@ -139,13 +150,14 @@ Envía una nota de voz y recibirás el Markdown formateado por chat (o como docu
 
 Comandos: `/start`, `/help`, `/style <estilo>`, `/language <LANG>`.
 
-### Troubleshooting
+### Motor local vs remoto
 
-| Síntoma | Causa / solución |
-|---------|------------------|
-| Panic `Cannot get the TELOXIDE_TOKEN env variable` | Token no exportado. Usa `set -a && source .env && set +a` o `TELOXIDE_TOKEN=... cargo run` |
-| Bot arranca pero no responde | Token inválido o bot no creado en @BotFather |
-| Errores al transcribir | Motor remoto requiere `OPENAI_API_KEY` cargada
+El bot usa el motor **remoto** por defecto. Para usar Whisper local:
+
+```bash
+export VOICE2MD_ENGINE=local
+export VOICE2MD_MODEL_PATH=models/ggml-tiny.bin
+```
 
 ## Configuración
 
@@ -154,7 +166,9 @@ Variables de entorno (ver `.env.example`):
 | Variable | Uso |
 |----------|-----|
 | `TELOXIDE_TOKEN` | Token del bot de Telegram |
-| `OPENAI_API_KEY` | Clave para el motor remoto (nombre configurable) |
+| `VOICE2MD_ENGINE` | Motor del bot: `local` \| `remote` (default `remote`) |
+| `VOICE2MD_MODEL_PATH` | Ruta al modelo local (default `models/ggml-tiny.bin`) |
+| `OPENAI_API_KEY` | Clave para el motor remoto |
 | `VOICE2MD_CONFIG` | Ruta a `config.toml` (opcional) |
 
 La CLI también lee `config.toml` (local o `~/.config/voice2md/config.toml`). Ejemplo en `config/config.example.toml`.

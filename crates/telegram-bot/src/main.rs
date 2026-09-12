@@ -41,10 +41,28 @@ async fn main() -> Result<()> {
     let bot = Bot::from_env();
     let token = bot.token().to_owned();
 
-    let engine = Box::new(
-        RemoteWhisperEngine::new(RemoteWhisperConfig::default())
-            .expect("failed to build remote engine"),
-    );
+    let engine: Box<dyn voice2md_core::TranscriptionEngine> =
+        match std::env::var("VOICE2MD_ENGINE").as_deref() {
+            Ok("local") => {
+                let model_path = std::env::var("VOICE2MD_MODEL_PATH")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| std::path::PathBuf::from("models/ggml-base.bin"));
+                info!(?model_path, "using local whisper engine");
+                let local = voice2md_transcriber::LocalWhisperConfig {
+                    model_path,
+                    ..Default::default()
+                };
+                Box::new(voice2md_transcriber::LocalWhisperEngine::new(local))
+            }
+            Ok("remote") | Err(_) => {
+                info!("using remote whisper engine");
+                Box::new(
+                    RemoteWhisperEngine::new(RemoteWhisperConfig::default())
+                        .expect("failed to build remote engine"),
+                )
+            }
+            Ok(other) => anyhow::bail!("unknown VOICE2MD_ENGINE: {other} (local | remote)"),
+        };
 
     let storage = Box::new(handlers::ChatStorage);
     let audio_repo = Box::new(TelegramAudioRepository::new(token));
@@ -70,14 +88,12 @@ async fn main() -> Result<()> {
 
     let handler = dptree::entry().branch(
         Update::filter_message()
-            .branch(
-                dptree::entry()
-                    .filter_command::<Command>()
-                    .endpoint(move |msg: Message, cmd: Command| {
-                        let d = Arc::clone(&d_cmd);
-                        async move { handlers::command_handler(d, msg, cmd).await }
-                    }),
-            )
+            .branch(dptree::entry().filter_command::<Command>().endpoint(
+                move |msg: Message, cmd: Command| {
+                    let d = Arc::clone(&d_cmd);
+                    async move { handlers::command_handler(d, msg, cmd).await }
+                },
+            ))
             .branch(dptree::endpoint(move |msg: Message| {
                 let d = Arc::clone(&d_msg);
                 async move { handlers::message_handler(d, msg).await }
